@@ -93,12 +93,14 @@ func (usecase *LeaseUsecase) DelegateLease(ctx context.Context, request domain.D
 		Resources:  parent.Resources,
 		Expiration: parent.Expiration,
 		Depth:      parent.Depth,
+		MaxDepth:   parent.MaxDepth,
 	}
 	childContext := attenuation.AuthorityContext{
 		Actions:    request.Actions,
 		Resources:  request.Resources,
 		Expiration: expiration,
 		Depth:      parent.Depth + 1,
+		MaxDepth:   parent.MaxDepth,
 	}
 	if err := attenuation.Validate(parentContext, childContext); err != nil {
 		return domain.IssuedLease{}, fmt.Errorf("%w: %v", domain.ErrInvalidAttenuation, err)
@@ -164,9 +166,11 @@ func validateValues(actions, resources []string) error {
 		Resources:  resources,
 		Expiration: time.Unix(1, 0),
 		Depth:      0,
+		MaxDepth:   1,
 	}
 	child := context
 	child.Depth = 1
+	child.MaxDepth = 1
 	child.Expiration = time.Unix(0, 0)
 	if err := attenuation.Validate(context, child); err != nil && !errors.Is(err, attenuation.ErrNotStrict) {
 		return fmt.Errorf("%w: %v", domain.ErrInvalidLease, err)

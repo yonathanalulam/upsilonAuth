@@ -8,6 +8,8 @@ import (
 
 var (
 	ErrInvalidDepth       = errors.New("child depth must be exactly one greater than parent depth")
+	ErrMaxDepthExceeded   = errors.New("child depth exceeds parent maximum depth")
+	ErrMaxDepthExpanded   = errors.New("child maximum depth exceeds parent maximum depth")
 	ErrExpirationExtended = errors.New("child expiration exceeds parent expiration")
 	ErrActionsExpanded    = errors.New("child actions are not a subset of parent actions")
 	ErrResourcesExpanded  = errors.New("child resources are not a subset of parent resources")
@@ -20,6 +22,7 @@ type AuthorityContext struct {
 	Resources  []string
 	Expiration time.Time
 	Depth      int
+	MaxDepth   int
 }
 
 func Validate(parent, child AuthorityContext) error {
@@ -31,6 +34,15 @@ func Validate(parent, child AuthorityContext) error {
 	}
 	if parent.Depth == int(^uint(0)>>1) || child.Depth != parent.Depth+1 {
 		return ErrInvalidDepth
+	}
+	if child.Depth > parent.MaxDepth {
+		return ErrMaxDepthExceeded
+	}
+	if child.MaxDepth > parent.MaxDepth {
+		return ErrMaxDepthExpanded
+	}
+	if child.MaxDepth < child.Depth {
+		return ErrInvalidContext
 	}
 	if child.Expiration.After(parent.Expiration) {
 		return ErrExpirationExtended
@@ -48,7 +60,7 @@ func Validate(parent, child AuthorityContext) error {
 		return ErrResourcesExpanded
 	}
 
-	if len(childActions) == len(parentActions) && len(childResources) == len(parentResources) && child.Expiration.Equal(parent.Expiration) {
+	if len(childActions) == len(parentActions) && len(childResources) == len(parentResources) && child.Expiration.Equal(parent.Expiration) && child.MaxDepth == parent.MaxDepth {
 		return ErrNotStrict
 	}
 
@@ -56,7 +68,7 @@ func Validate(parent, child AuthorityContext) error {
 }
 
 func validateContext(context AuthorityContext) error {
-	if context.Depth < 0 || context.Expiration.IsZero() {
+	if context.Depth < 0 || context.MaxDepth < context.Depth || context.Expiration.IsZero() {
 		return ErrInvalidContext
 	}
 	if hasEmptyOrDuplicate(context.Actions) || hasEmptyOrDuplicate(context.Resources) {

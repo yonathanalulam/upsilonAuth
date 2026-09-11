@@ -6,13 +6,14 @@ import (
 	"time"
 )
 
-func TestValidate(t *testing.T) {
-	expiration := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
+func TestValidateMonotonicAttenuation(t *testing.T) {
+	expiration := time.Date(2026, time.September, 11, 12, 0, 0, 0, time.UTC)
 	parent := AuthorityContext{
-		Actions:    []string{"read", "write"},
-		Resources:  []string{"orders", "invoices"},
+		Actions:    []string{"payments:refund", "payments:read"},
+		Resources:  []string{"customer/123", "invoice/456"},
 		Expiration: expiration,
-		Depth:      2,
+		Depth:      1,
+		MaxDepth:   3,
 	}
 
 	tests := []struct {
@@ -21,82 +22,111 @@ func TestValidate(t *testing.T) {
 		want  error
 	}{
 		{
-			name: "action subset",
+			name: "strict action reduction",
 			child: AuthorityContext{
-				Actions:    []string{"read"},
-				Resources:  []string{"orders", "invoices"},
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/123", "invoice/456"},
 				Expiration: expiration,
-				Depth:      3,
+				Depth:      2,
+				MaxDepth:   3,
 			},
 		},
 		{
-			name: "resource subset and earlier expiration",
+			name: "strict resource and ttl reduction",
 			child: AuthorityContext{
-				Actions:    []string{"read", "write"},
-				Resources:  []string{"orders"},
+				Actions:    []string{"payments:refund", "payments:read"},
+				Resources:  []string{"customer/123"},
 				Expiration: expiration.Add(-time.Minute),
-				Depth:      3,
+				Depth:      2,
+				MaxDepth:   3,
 			},
 		},
 		{
-			name: "equal authority",
+			name: "strict max depth reduction",
 			child: AuthorityContext{
-				Actions:    []string{"write", "read"},
-				Resources:  []string{"invoices", "orders"},
+				Actions:    []string{"payments:refund", "payments:read"},
+				Resources:  []string{"customer/123", "invoice/456"},
 				Expiration: expiration,
-				Depth:      3,
+				Depth:      2,
+				MaxDepth:   2,
 			},
-			want: ErrNotStrict,
 		},
 		{
-			name: "expanded action",
+			name: "action privilege escalation",
 			child: AuthorityContext{
-				Actions:    []string{"read", "delete"},
-				Resources:  []string{"orders"},
-				Expiration: expiration,
-				Depth:      3,
+				Actions:    []string{"payments:read", "payments:delete"},
+				Resources:  []string{"customer/123"},
+				Expiration: expiration.Add(-time.Minute),
+				Depth:      2,
+				MaxDepth:   3,
 			},
 			want: ErrActionsExpanded,
 		},
 		{
-			name: "expanded resource",
+			name: "resource scope broadening",
 			child: AuthorityContext{
-				Actions:    []string{"read"},
-				Resources:  []string{"payments"},
-				Expiration: expiration,
-				Depth:      3,
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/*"},
+				Expiration: expiration.Add(-time.Minute),
+				Depth:      2,
+				MaxDepth:   3,
 			},
 			want: ErrResourcesExpanded,
 		},
 		{
-			name: "extended expiration",
+			name: "child ttl exceeds parent ttl",
 			child: AuthorityContext{
-				Actions:    []string{"read"},
-				Resources:  []string{"orders"},
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/123"},
 				Expiration: expiration.Add(time.Second),
-				Depth:      3,
+				Depth:      2,
+				MaxDepth:   3,
 			},
 			want: ErrExpirationExtended,
 		},
 		{
-			name: "skipped depth",
+			name: "delegation exceeds max depth",
 			child: AuthorityContext{
-				Actions:    []string{"read"},
-				Resources:  []string{"orders"},
-				Expiration: expiration,
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/123"},
+				Expiration: expiration.Add(-time.Minute),
 				Depth:      4,
+				MaxDepth:   4,
 			},
 			want: ErrInvalidDepth,
 		},
 		{
-			name: "duplicate action",
+			name: "next delegation exceeds max depth",
 			child: AuthorityContext{
-				Actions:    []string{"read", "read"},
-				Resources:  []string{"orders"},
-				Expiration: expiration,
-				Depth:      3,
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/123"},
+				Expiration: expiration.Add(-time.Minute),
+				Depth:      2,
+				MaxDepth:   1,
 			},
 			want: ErrInvalidContext,
+		},
+		{
+			name: "maximum depth expansion",
+			child: AuthorityContext{
+				Actions:    []string{"payments:read"},
+				Resources:  []string{"customer/123"},
+				Expiration: expiration.Add(-time.Minute),
+				Depth:      2,
+				MaxDepth:   4,
+			},
+			want: ErrMaxDepthExpanded,
+		},
+		{
+			name: "authority unchanged",
+			child: AuthorityContext{
+				Actions:    []string{"payments:read", "payments:refund"},
+				Resources:  []string{"invoice/456", "customer/123"},
+				Expiration: expiration,
+				Depth:      2,
+				MaxDepth:   3,
+			},
+			want: ErrNotStrict,
 		},
 	}
 
@@ -107,5 +137,28 @@ func TestValidate(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %v", err, test.want)
 			}
 		})
+	}
+}
+
+func TestValidateRejectsDelegationAtMaximumDepth(t *testing.T) {
+	expiration := time.Date(2026, time.September, 11, 12, 0, 0, 0, time.UTC)
+	parent := AuthorityContext{
+		Actions:    []string{"payments:read"},
+		Resources:  []string{"customer/123"},
+		Expiration: expiration,
+		Depth:      3,
+		MaxDepth:   3,
+	}
+	child := AuthorityContext{
+		Actions:    []string{"payments:read"},
+		Resources:  []string{"customer/123"},
+		Expiration: expiration.Add(-time.Minute),
+		Depth:      4,
+		MaxDepth:   4,
+	}
+
+	err := Validate(parent, child)
+	if !errors.Is(err, ErrMaxDepthExceeded) {
+		t.Fatalf("Validate() error = %v, want %v", err, ErrMaxDepthExceeded)
 	}
 }
