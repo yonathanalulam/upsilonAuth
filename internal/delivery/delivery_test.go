@@ -1,11 +1,13 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -296,6 +298,51 @@ func TestSignedMintRejectsQueryString(t *testing.T) {
 	handler.Router().ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("response status = %d", response.Code)
+	}
+}
+
+func TestRecoveryNeverLogsCredentialHeaders(t *testing.T) {
+	publicKey, _, err := authcrypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousMode := gin.Mode()
+	gin.SetMode(gin.DebugMode)
+	t.Cleanup(func() { gin.SetMode(previousMode) })
+
+	var logs bytes.Buffer
+	previousWriter := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(previousWriter) })
+
+	handler := newTestHandler(t, &leaseUsecaseStub{}, publicKey)
+	router := handler.Router()
+	router.GET("/panic", func(*gin.Context) { panic("panic-value-must-not-be-logged") })
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/panic", nil)
+	request.Header.Set("Authorization", "Bearer admin-token-must-not-be-logged")
+	request.Header.Set("DPoP", "proof-must-not-be-logged")
+	request.Header.Set("Upsilon-Capability", "capability-must-not-be-logged")
+	request.Header.Set("X-Upsilon-Signature", "signature-must-not-be-logged")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("response status = %d", response.Code)
+	}
+	for _, sensitive := range []string{
+		"admin-token-must-not-be-logged",
+		"proof-must-not-be-logged",
+		"capability-must-not-be-logged",
+		"signature-must-not-be-logged",
+		"panic-value-must-not-be-logged",
+	} {
+		if strings.Contains(logs.String(), sensitive) {
+			t.Fatalf("recovery log contains sensitive value")
+		}
+	}
+	if !strings.Contains(logs.String(), `"event":"http.panic_recovered"`) {
+		t.Fatalf("recovery event was not logged")
 	}
 }
 

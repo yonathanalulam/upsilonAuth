@@ -239,7 +239,7 @@ func (handler *Handler) Router() *gin.Engine {
 	if err := router.SetTrustedProxies(handler.trustedProxies); err != nil {
 		panic(err)
 	}
-	router.Use(handler.requestContext, gin.Recovery(), handler.requestLogger, handler.securityHeaders, handler.enforceTLS, handler.rateLimit)
+	router.Use(handler.requestContext, handler.safeRecovery, handler.requestLogger, handler.securityHeaders, handler.enforceTLS, handler.rateLimit)
 	router.GET("/healthz", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	router.GET("/readyz", handler.ready)
 	router.GET("/metrics", handler.requireAdmin, handler.serveMetrics)
@@ -272,6 +272,29 @@ func (handler *Handler) requestContext(c *gin.Context) {
 	c.Header("X-Request-ID", identifier)
 	c.Request = c.Request.WithContext(requestid.With(c.Request.Context(), identifier))
 	c.Set("upsilon.request_id", identifier)
+	c.Next()
+}
+
+func (handler *Handler) safeRecovery(c *gin.Context) {
+	defer func() {
+		if recover() == nil {
+			return
+		}
+		record := map[string]any{
+			"event":      "http.panic_recovered",
+			"request_id": requestid.FromContext(c.Request.Context()),
+			"method":     c.Request.Method,
+			"path":       c.FullPath(),
+		}
+		if encoded, err := json.Marshal(record); err == nil {
+			log.Print(string(encoded))
+		}
+		if c.Writer.Written() {
+			c.Abort()
+			return
+		}
+		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+	}()
 	c.Next()
 }
 
