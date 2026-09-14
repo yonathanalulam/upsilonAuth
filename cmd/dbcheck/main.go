@@ -28,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	required := []string{"workloads", "leases", "audit_events"}
+	required := []string{"workloads", "leases", "audit_events", "workload_nonces", "schema_migrations"}
 	for _, table := range required {
 		var exists bool
 		err := pool.QueryRow(ctx, `SELECT EXISTS (
@@ -60,4 +60,18 @@ func main() {
 		}
 		fmt.Println("leases." + column)
 	}
+
+	var disabledAtExists bool
+	err = pool.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1
+		FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'workloads' AND column_name = 'disabled_at'
+	)`).Scan(&disabledAtExists)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !disabledAtExists {
+		log.Fatal(errors.New("required workload column is missing: disabled_at"))
+	}
+	fmt.Println("workloads.disabled_at")
 }
