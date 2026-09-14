@@ -356,8 +356,8 @@ function Hero() {
           <h1>Temporary, delegated authority for machine workloads.</h1>
           <p>UpsilonAuth gives machine workloads temporary permissions without relying on long-lived credentials. Services, workers, and automated agents can request scoped capability leases, delegate smaller leases, and verify them inside the services they call.</p>
           <div className="hero-actions">
-            <a className="primary-button" href="#demo">
-              Try the example
+            <a className="primary-button" href="#quickstart">
+              Try out uAuth
               <ArrowRight size={16} />
             </a>
             <a className="text-link" href={repository} target="_blank" rel="noreferrer">
