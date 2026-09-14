@@ -11,6 +11,11 @@ linters:
     - nilerr
     - prealloc
     - unconvert
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec]
+        text: "G101|G404|G115"
 formatters:
   enable:
     - gofmt
@@ -18,8 +23,3 @@ formatters:
 run:
   timeout: 5m
   tests: true
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters: [gosec]
-      text: "G101|G404|G115"
