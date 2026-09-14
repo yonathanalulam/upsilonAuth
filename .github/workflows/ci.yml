@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: 1.26.8
           cache-dependency-path: go.sum
       - name: Formatting
         run: test -z "$(gofmt -l cmd internal sdk examples)"
@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: 1.26.8
           cache-dependency-path: go.sum
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -112,7 +112,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: 1.26.8
           cache-dependency-path: go.sum
       - name: Generate local credentials
         run: go run ./cmd/keygen >> "$GITHUB_ENV"
