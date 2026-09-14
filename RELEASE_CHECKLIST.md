@@ -16,7 +16,7 @@ This file records the local public-beta candidate checks completed on 2026-09-14
 - [x] API and SDK examples compile, and the documented Compose flow passes enrollment through revocation.
 - [x] website lint, production build, and 14 desktop/mobile Playwright tests pass.
 - [x] the interactive example supports keyboard and pointer input and is labeled as frontend-only.
-- [x] the container builds as `nonroot:nonroot`, exposes only port 8080, and passes the configured security checks.
+- [x] `linux/amd64` and `linux/arm64` containers build as `nonroot:nonroot`, expose only port 8080, and pass the configured security checks.
 - [x] the pinned Trivy scan reports no unaccepted HIGH/CRITICAL finding.
 - [x] a pinned Syft build generated a valid CycloneDX SBOM.
 - [x] signing, admin, consumption, and database secrets are absent from committed history and final image layers.

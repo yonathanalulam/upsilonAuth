@@ -153,7 +153,7 @@ make vuln
 make lint
 ```
 
-`make release-check` additionally runs race tests, website lint/build/e2e, and a container build. CI also runs a clean PostgreSQL migration/concurrency suite, the end-to-end Compose quickstart, a HIGH/CRITICAL image scan, and CycloneDX SBOM generation.
+`make release-check` additionally runs race tests, website lint/build/e2e, and a container build. CI also runs a clean PostgreSQL migration/concurrency suite, the end-to-end Compose quickstart, `linux/amd64` and `linux/arm64` container builds, HIGH/CRITICAL image scans, and CycloneDX SBOM generation.
 
 ## Current limitations
 

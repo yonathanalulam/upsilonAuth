@@ -49,7 +49,25 @@ Run it in small batches for high-volume systems. Do not delete audit records; ex
 
 ## Container
 
-The shipped multi-stage image uses a distroless runtime, runs as `nonroot:nonroot`, contains only the server/migration/health binaries and migrations, and has no shell. Compose drops all Linux capabilities, enables `no-new-privileges`, uses a read-only filesystem plus a small `noexec` tmpfs, publishes only port 8080 on loopback, and keeps PostgreSQL private.
+The shipped multi-stage image supports `linux/amd64` and `linux/arm64`. Release tags are published as a multi-platform image index, so Docker selects the matching image for the deployment host. The image uses a distroless runtime, runs as `nonroot:nonroot`, contains only the server/migration/health binaries and migrations, and has no shell. Compose drops all Linux capabilities, enables `no-new-privileges`, uses a read-only filesystem plus a small `noexec` tmpfs, publishes only port 8080 on loopback, and keeps PostgreSQL private.
+
+Build an image for the current platform locally:
+
+```sh
+make container
+```
+
+Validate both supported platforms into a local OCI archive, or publish a release image to a registry:
+
+```sh
+# One-time setup when the current builder does not support multi-platform output.
+docker buildx create --name upsilonauth-builder --driver docker-container --use --bootstrap
+
+make container-multiarch
+make container-push RELEASE_IMAGE=ghcr.io/your-org/upsilonauth:v0.1.0
+```
+
+Publishing is what creates the registry manifest that lets deployment platforms pull the correct architecture automatically. The tag-based GitHub release workflow uses the same `linux/amd64,linux/arm64` build.
 
 Equivalent production runtime controls should include:
 
