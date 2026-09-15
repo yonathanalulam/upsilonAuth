@@ -22,6 +22,7 @@ import {
   useMotionValueEvent,
   useReducedMotion,
   useScroll,
+  useTransform,
   type Variants,
 } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -158,39 +159,33 @@ const endpoints = [
 ];
 
 const reveal: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, clipPath: "inset(0 0 24% 0)", transform: "translateY(18px)" },
   visible: (delay: number = 0) => ({
     opacity: 1,
-    y: 0,
-    transition: { type: "spring", stiffness: 105, damping: 22, mass: 0.78, delay },
+    clipPath: "inset(0 0 0% 0)",
+    transform: "translateY(0px)",
+    transition: { duration: 0.7, delay, ease: [0.23, 1, 0.32, 1] },
   }),
 };
 
 type Theme = "light" | "dark";
 
 function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
-  const reduceMotion = useReducedMotion();
   const nextTheme = theme === "dark" ? "light" : "dark";
 
   return (
     <button
       className="theme-toggle"
       type="button"
+      data-theme={theme}
       onClick={onToggle}
       aria-label={`Switch to ${nextTheme} mode`}
+      aria-pressed={theme === "dark"}
       title={`Switch to ${nextTheme} mode`}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={theme}
-          initial={reduceMotion ? false : { opacity: 0, rotate: -18, scale: 0.88 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={reduceMotion ? undefined : { opacity: 0, rotate: 18, scale: 0.88 }}
-          transition={{ duration: reduceMotion ? 0 : 0.16 }}
-        >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </motion.span>
-      </AnimatePresence>
+      <span className="theme-toggle-icon"><Sun size={13} /></span>
+      <span className="theme-toggle-icon"><Moon size={13} /></span>
+      <span className="theme-toggle-thumb" aria-hidden="true" />
     </button>
   );
 }
@@ -210,10 +205,10 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
           key={copied ? "done" : "copy"}
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={reduceMotion ? undefined : { opacity: 0, scale: 0.9 }}
-          transition={{ duration: reduceMotion ? 0 : 0.12 }}
+          initial={reduceMotion ? false : { opacity: 0, transform: "scale(0.92)" }}
+          animate={{ opacity: 1, transform: "scale(1)" }}
+          exit={reduceMotion ? undefined : { opacity: 0, transform: "scale(0.92)" }}
+          transition={{ duration: reduceMotion ? 0 : 0.16, ease: [0.23, 1, 0.32, 1] }}
         >
           {copied ? <Check size={15} /> : <Copy size={15} />}
         </motion.span>
@@ -223,7 +218,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 function Header({ theme, onThemeToggle }: { theme: Theme; onThemeToggle: () => void }) {
-  const { scrollY } = useScroll();
+  const { scrollY, scrollYProgress } = useScroll();
+  const progressTransform = useTransform(scrollYProgress, (progress) => `scaleX(${progress})`);
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -249,11 +245,12 @@ function Header({ theme, onThemeToggle }: { theme: Theme; onThemeToggle: () => v
 
   return (
     <>
+      <motion.div className="scroll-progress" style={{ transform: progressTransform }} aria-hidden="true" />
       <motion.header
         className="site-header"
         initial={false}
-        animate={{ y: visible ? "0%" : "-120%" }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 430, damping: 39 }}
+        animate={{ transform: visible ? "translateY(0%)" : "translateY(-120%)" }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
       >
         <div className="nav-inner">
           <Brand href="#top" />
@@ -282,12 +279,10 @@ function Header({ theme, onThemeToggle }: { theme: Theme; onThemeToggle: () => v
             aria-label="Scroll to top"
             title="Scroll to top"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: 8, scale: 0.94 }}
-            whileHover={reduceMotion ? undefined : { y: -2 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-            transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30 }}
+            initial={reduceMotion ? false : { opacity: 0, transform: "translateY(8px) scale(0.96)" }}
+            animate={{ opacity: 1, transform: "translateY(0px) scale(1)" }}
+            exit={reduceMotion ? undefined : { opacity: 0, transform: "translateY(6px) scale(0.96)" }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
           >
             <ArrowUp size={16} />
           </motion.button>
@@ -303,10 +298,10 @@ function LeasePreview() {
   return (
     <motion.div
       className="lease-preview"
-      initial={false}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px) scale(0.99)" }}
+      whileInView={{ opacity: 1, transform: "translateY(0px) scale(1)" }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 100, damping: 22, delay: 0.14 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.72, delay: 0.12, ease: [0.23, 1, 0.32, 1] }}
     >
       <div className="preview-header">
         <span><Terminal size={14} /> Lease issued</span>
@@ -343,19 +338,32 @@ function LeasePreview() {
 
 function Hero() {
   const reduceMotion = useReducedMotion();
+  const heroSequence: Variants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.1, delayChildren: 0.06 } },
+  };
+  const heroItem: Variants = {
+    hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)", transform: "translateY(16px)" },
+    visible: {
+      opacity: 1,
+      clipPath: "inset(0 0 0% 0)",
+      transform: "translateY(0px)",
+      transition: { duration: 0.72, ease: [0.23, 1, 0.32, 1] },
+    },
+  };
 
   return (
     <section className="hero" id="top">
       <div className="hero-inner">
         <motion.div
           className="hero-copy"
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 105, damping: 22 }}
+          initial={reduceMotion ? false : "hidden"}
+          animate="visible"
+          variants={heroSequence}
         >
-          <h1>Temporary, delegated authority for machine workloads.</h1>
-          <p>UpsilonAuth gives machine workloads temporary permissions without relying on long-lived credentials. Services, workers, and automated agents can request scoped capability leases, delegate smaller leases, and verify them inside the services they call.</p>
-          <div className="hero-actions">
+          <motion.h1 variants={heroItem}>Temporary, delegated authority for machine workloads.</motion.h1>
+          <motion.p variants={heroItem}>UpsilonAuth gives machine workloads temporary permissions without relying on long-lived credentials. Services, workers, and automated agents can request scoped capability leases, delegate smaller leases, and verify them inside the services they call.</motion.p>
+          <motion.div className="hero-actions" variants={heroItem}>
             <a className="primary-button" href="#quickstart">
               Try out uAuth
               <ArrowRight size={16} />
@@ -363,7 +371,7 @@ function Hero() {
             <a className="text-link" href={repository} target="_blank" rel="noreferrer">
               Read the source
             </a>
-          </div>
+          </motion.div>
         </motion.div>
         <LeasePreview />
       </div>
@@ -393,7 +401,7 @@ function Concept() {
 
   return (
     <section className="section concept-section" id="why">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>Use temporary permissions instead of shared credentials.</h2>
         <p>UpsilonAuth is an authorization service for machine workloads. It issues capability leases for a specific audience, set of actions, resources, and period of time.</p>
       </motion.div>
@@ -405,7 +413,7 @@ function Concept() {
               className="principle"
               key={item.title}
               custom={reduceMotion ? 0 : index * 0.07}
-              initial={false}
+              initial={reduceMotion ? false : "hidden"}
               whileInView="visible"
               viewport={{ once: true, margin: "-50px" }}
               variants={reveal}
@@ -426,16 +434,16 @@ function DelegationFlow() {
 
   return (
     <section className="section flow-section" id="flow">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>How authority moves through UpsilonAuth.</h2>
         <p>An administrator sets the workload&apos;s maximum permissions. The workload requests a temporary lease, delegates a smaller lease when needed, and sends that lease to the service it wants to call.</p>
       </motion.div>
       <motion.div
         className="delegation-board"
-        initial={false}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px)" }}
+        whileInView={{ opacity: 1, transform: "translateY(0px)" }}
         viewport={{ once: true, margin: "-50px" }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 96, damping: 22 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.68, ease: [0.23, 1, 0.32, 1] }}
       >
         <div className="delegation-stage">
           <div className="stage-heading"><KeyRound size={17} /><span>Workload grant</span></div>
@@ -465,7 +473,7 @@ function DelegationFlow() {
           <small>aud service:payments</small>
         </div>
       </motion.div>
-      <motion.div className="guardrail" initial={false} whileInView="visible" viewport={{ once: true, margin: "-40px" }} variants={reveal}>
+      <motion.div className="guardrail" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-40px" }} variants={reveal}>
         <ShieldCheck size={17} />
         <p>A delegated lease can remove actions, narrow resources, shorten its lifetime, add constraints, or stop further delegation. It cannot add authority that its parent did not have.</p>
       </motion.div>
@@ -474,18 +482,20 @@ function DelegationFlow() {
 }
 
 function ProductFit() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <section className="section fit-section" id="fit">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>Where UpsilonAuth fits.</h2>
         <p>Human authentication systems answer who a person is. UpsilonAuth focuses on what an automated workload is temporarily allowed to do.</p>
       </motion.div>
       <div className="fit-grid">
-        <motion.article initial={false} whileInView="visible" viewport={{ once: true }} variants={reveal}>
+        <motion.article initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true }} variants={reveal}>
           <h3>Use it for machine workloads</h3>
           <p>UpsilonAuth is built for services, background workers, CI/CD jobs, serverless functions, pipelines, MCP servers, agents, and other internal automation.</p>
         </motion.article>
-        <motion.article initial={false} whileInView="visible" viewport={{ once: true }} variants={reveal}>
+        <motion.article initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true }} variants={reveal}>
           <h3>Use other tools for human identity</h3>
           <p>UpsilonAuth is not a human authentication provider, OAuth or Auth0 replacement, secrets manager, API gateway, complete IAM system, or general-purpose policy engine.</p>
         </motion.article>
@@ -496,21 +506,28 @@ function ProductFit() {
 
 function Quickstart() {
   const [active, setActive] = useState(0);
+  const [direction, setDirection] = useState(1);
   const reduceMotion = useReducedMotion();
   const selected = quickstart[active];
 
+  function selectStep(index: number) {
+    if (index === active) return;
+    setDirection(index > active ? 1 : -1);
+    setActive(index);
+  }
+
   return (
     <section className="section quickstart-section" id="quickstart">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>Run a complete local example.</h2>
         <p>You need Git, Go 1.26 or newer, and Docker with Compose v2. The steps below start PostgreSQL and UpsilonAuth, register a workload, request and delegate a lease, verify it in Gin, and revoke it.</p>
       </motion.div>
       <motion.div
         className="quickstart-workbench"
-        initial={false}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px)" }}
+        whileInView={{ opacity: 1, transform: "translateY(0px)" }}
         viewport={{ once: true, margin: "-50px" }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 96, damping: 22 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.68, ease: [0.23, 1, 0.32, 1] }}
       >
         <div className="step-tabs" role="tablist" aria-label="Quickstart steps">
           {quickstart.map((step, index) => (
@@ -520,11 +537,11 @@ function Quickstart() {
               type="button"
               role="tab"
               aria-selected={index === active}
-              onClick={() => setActive(index)}
+              onClick={() => selectStep(index)}
             >
               <span>{index + 1}</span>
               {step.label}
-              {index === active && <motion.i layoutId="active-tab" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 35 }} />}
+              {index === active && <motion.i layoutId="active-tab" transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.23, 1, 0.32, 1] }} />}
             </button>
           ))}
         </div>
@@ -539,10 +556,10 @@ function Quickstart() {
           <AnimatePresence mode="wait">
             <motion.pre
               key={active}
-              initial={reduceMotion ? false : { opacity: 0, y: 6, filter: "blur(2px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -4, filter: "blur(2px)" }}
-              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+              initial={reduceMotion ? false : { opacity: 0, transform: `translateX(${direction * 10}px)` }}
+              animate={{ opacity: 1, transform: "translateX(0px)" }}
+              exit={reduceMotion ? undefined : { opacity: 0, transform: `translateX(${direction * -7}px)` }}
+              transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.77, 0, 0.175, 1] }}
             >
               <code>{selected.code}</code>
             </motion.pre>
@@ -582,7 +599,7 @@ function Reference() {
 
   return (
     <section className="section reference-section">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>HTTP API</h2>
         <p>Admin calls manage workloads and leases. Workloads sign lease requests with Ed25519. Protected services fetch public verification and revocation data.</p>
       </motion.div>
@@ -595,8 +612,8 @@ function Reference() {
             aria-label={`Copy endpoint ${path}`}
             title={`Copy ${path}`}
             onClick={() => copyEndpoint(path)}
-            custom={index * 0.05}
-            initial={false}
+            custom={(index % 6) * 0.035}
+            initial={reduceMotion ? false : "hidden"}
             whileInView="visible"
             viewport={{ once: true, margin: "-30px" }}
             variants={reveal}
@@ -608,10 +625,10 @@ function Reference() {
               <motion.span
                 className="endpoint-feedback"
                 key={copiedEndpoint === path ? "copied" : "copy"}
-                initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={reduceMotion ? undefined : { opacity: 0, scale: 0.9 }}
-                transition={{ duration: reduceMotion ? 0 : 0.14 }}
+                initial={reduceMotion ? false : { opacity: 0, transform: "scale(0.92)" }}
+                animate={{ opacity: 1, transform: "scale(1)" }}
+                exit={reduceMotion ? undefined : { opacity: 0, transform: "scale(0.92)" }}
+                transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.23, 1, 0.32, 1] }}
               >
                 {copiedEndpoint === path ? <Check size={16} /> : <ArrowRight size={16} />}
               </motion.span>
@@ -634,7 +651,7 @@ function Protocol() {
   ];
   return (
     <section className="section protocol-section" id="protocol">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>The request flow, step by step.</h2>
         <p>Registration sets the upper bound. Signed requests create leases. Protected services verify those leases before running application code.</p>
       </motion.div>
@@ -644,7 +661,7 @@ function Protocol() {
             className="protocol-step"
             key={number}
             custom={reduceMotion ? 0 : index * 0.07}
-            initial={false}
+            initial={reduceMotion ? false : "hidden"}
             whileInView="visible"
             viewport={{ once: true, margin: "-50px" }}
             variants={reveal}
@@ -655,7 +672,7 @@ function Protocol() {
           </motion.article>
         ))}
       </div>
-      <motion.div className="protocol-contract" initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 96, damping: 22 }}>
+      <motion.div className="protocol-contract" initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px)" }} whileInView={{ opacity: 1, transform: "translateY(0px)" }} viewport={{ once: true, margin: "-50px" }} transition={reduceMotion ? { duration: 0 } : { duration: 0.68, ease: [0.23, 1, 0.32, 1] }}>
         <div className="protocol-contract-heading">
           <span>Signed request contract</span>
           <code>SHA-256</code>
@@ -672,6 +689,7 @@ hex(sha256(request_body))`}</code></pre>
 }
 
 function SecuritySnapshot() {
+  const reduceMotion = useReducedMotion();
   const controls = [
     {
       label: "LOCAL",
@@ -692,20 +710,20 @@ function SecuritySnapshot() {
 
   return (
     <section className="section security-section" id="security">
-      <motion.div className="section-intro" initial={false} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
+      <motion.div className="section-intro" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={reveal}>
         <h2>Security behavior</h2>
         <p>Services perform signature and claim checks locally. Revocation freshness and finite-use counters require shared state, so their availability rules are configured separately.</p>
       </motion.div>
       <div className="security-grid">
         {controls.map((control, index) => (
-          <motion.article key={control.title} custom={index * 0.06} initial={false} whileInView="visible" viewport={{ once: true }} variants={reveal}>
+          <motion.article key={control.title} custom={index * 0.055} initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true }} variants={reveal}>
             <span>{control.label}</span>
             <h3>{control.title}</h3>
             <p>{control.text}</p>
           </motion.article>
         ))}
       </div>
-      <motion.div className="status-panel" initial={false} whileInView="visible" viewport={{ once: true }} variants={reveal}>
+      <motion.div className="status-panel" initial={reduceMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true }} variants={reveal}>
         <div>
           <h3>Current status: beta</h3>
           <p>UpsilonAuth is currently in beta. It is designed for developer evaluation and controlled deployments. It has automated security tests, but it has not had an independent security audit or substantial production use.</p>
@@ -739,14 +757,13 @@ function Footer() {
 
 export function LandingPage() {
   const [theme, setTheme] = useState<Theme>("dark");
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const stored = window.localStorage.getItem("upsilonauth-theme") as Theme | null;
       const preferred = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-      const initial = stored ?? preferred;
-      setTheme(initial);
-      document.documentElement.dataset.theme = initial;
+      setTheme(stored ?? preferred);
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -754,13 +771,25 @@ export function LandingPage() {
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    window.localStorage.setItem("upsilonauth-theme", next);
+    const applyTheme = () => {
+      setTheme(next);
+      document.documentElement.dataset.theme = next;
+      window.localStorage.setItem("upsilonauth-theme", next);
+    };
+    const transitionDocument = document as Document & {
+      startViewTransition?: (callback: () => void) => void;
+    };
+
+    if (!reduceMotion && transitionDocument.startViewTransition) {
+      transitionDocument.startViewTransition(applyTheme);
+      return;
+    }
+
+    applyTheme();
   }
 
   return (
-    <main>
+    <main className="landing-page">
       <Header theme={theme} onThemeToggle={toggleTheme} />
       <Hero />
       <AuthorizationDemo />

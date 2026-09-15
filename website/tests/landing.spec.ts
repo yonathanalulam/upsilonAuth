@@ -86,6 +86,19 @@ test("uses the UpsilonAuth name and logo consistently", async ({ page }) => {
   await expect(page.locator('img[src="/upsilonauth-logo.svg"]').first()).toBeVisible();
 });
 
+test("switches cleanly between dark and light themes", async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem("upsilonauth-theme", "dark"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
 test("keeps every public page within the viewport", async ({ page }) => {
   for (const path of ["/", "/docs", "/security"]) {
     await page.goto(path);
