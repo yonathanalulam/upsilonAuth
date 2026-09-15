@@ -142,7 +142,6 @@ The Go control plane authenticates signed workload requests, checks grant and de
 - [Migrations and recovery](docs/migrations.md)
 - [Security reporting](SECURITY.md)
 - [Threat model](THREAT_MODEL.md)
-- [Release checklist](RELEASE_CHECKLIST.md)
 
 ## Verification
 

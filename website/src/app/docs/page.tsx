@@ -195,7 +195,7 @@ curl --fail http://127.0.0.1:8080/readyz`}</code></pre>
             <h2>Configure a deployment</h2>
             <p>Production mode refuses to start without an HTTPS issuer, TLS enforcement, a TLS PostgreSQL URL, strong and separate admin and consumption credentials, a valid signing key, and verified migrations. Secret <code>_FILE</code> settings let you mount values from a secret manager.</p>
             <p>The distroless image runs non-root. Compose drops capabilities, enables no-new-privileges and a read-only filesystem, exposes the API only on loopback, and keeps PostgreSQL private. Use <code>cmd/migrate</code> as a separate migration job, then run replicas with <code>MIGRATION_MODE=verify</code>.</p>
-            <p>Before a real deployment, follow the <a href={`${repository}/blob/main/docs/deployment.md`}>deployment guide</a>, <a href={`${repository}/blob/main/RELEASE_CHECKLIST.md`}>release checklist</a>, and signing/workload key rotation procedures.</p>
+            <p>Before a real deployment, follow the <a href={`${repository}/blob/main/docs/deployment.md`}>deployment guide</a> and its signing and workload key rotation procedures.</p>
           </section>
 
           <section id="limits" className="docs-section">

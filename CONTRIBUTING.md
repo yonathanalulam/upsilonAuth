@@ -6,7 +6,7 @@ UpsilonAuth accepts focused changes that preserve a small, reviewable machine-au
 2. Never include real credentials, private keys, JWTs, authorization headers, or production data in code, tests, logs, or issues.
 3. Add a regression test for every authorization/security fix.
 4. Keep authority monotonic: no child may broaden any parent dimension.
-5. Run `make release-check` where supported, or the equivalent commands in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+5. Run `make release-check` where supported.
 6. Update API/SDK/deployment documentation when behavior changes.
 
 Security reports follow [SECURITY.md](SECURITY.md), not the public issue tracker.

@@ -89,7 +89,7 @@ export default function SecurityPage() {
               <p>It is intended for developer evaluation and controlled deployments. It has not had an independent security audit or substantial production use. Rate limits and PoP replay caches are process-local. Revocation snapshots use HTTPS but are not separately signed. Signing-key rotation is operator-managed, V1 administration uses a static high-entropy bearer credential, and the beta has no enterprise support SLA. Container base images are version-pinned but not digest-pinned.</p>
             </div>
             <p>An attacker with the server signing key can mint leases until verifiers stop trusting that key. An attacker with database access can change grants and revocation state. A stolen workload private key can sign requests until you rotate the key or disable the workload. Verifiers may use stale revocation data within the selected mode. Isolate keys, keep TTLs short, use small grants and PoP where appropriate, monitor the service, and rehearse key rotation.</p>
-            <p>Read the full <a href={`${repository}/blob/main/THREAT_MODEL.md`}>threat model</a>, <a href={`${repository}/blob/main/SECURITY.md`}>security policy and compromise guidance</a>, and <a href={`${repository}/blob/main/SECURITY_AUDIT.md`}>pre-remediation audit</a>.</p>
+            <p>Read the full <a href={`${repository}/blob/main/THREAT_MODEL.md`}>threat model</a> and <a href={`${repository}/blob/main/SECURITY.md`}>security policy and compromise guidance</a>.</p>
           </section>
 
           <footer className="docs-footer">

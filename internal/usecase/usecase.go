@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/yonathanalulam/upsilonAuth/internal/attenuation"
+	constraintpkg "github.com/yonathanalulam/upsilonAuth/internal/constraints"
 	authcrypto "github.com/yonathanalulam/upsilonAuth/internal/crypto"
 	"github.com/yonathanalulam/upsilonAuth/internal/domain"
 	resourcepkg "github.com/yonathanalulam/upsilonAuth/internal/resource"
@@ -395,7 +396,7 @@ func (usecase *LeaseUsecase) parentTokenMatches(parent domain.Lease, raw string,
 	if claims == nil || claims.ID != parent.TokenID || claims.Subject != parent.WorkloadID || claims.UPS.LeaseID != parent.ID || claims.UPS.RootLeaseID != parent.RootLeaseID || claims.UPS.RootWorkloadID != parent.RootWorkloadID || claims.UPS.WorkloadID != parent.WorkloadID || claims.UPS.DelegatedByWorkloadID != delegatedByID(parent) || claims.UPS.Depth != parent.Depth || claims.UPS.MaxDepth != parent.MaxDepth || claims.UPS.MaxUses != parent.MaxUses || claimConfirmation(claims) != parent.ConfirmationThumbprint || !claims.ExpiresAt.Equal(parent.Expiration) {
 		return false
 	}
-	if !sameStrings(claims.UPS.Actions, parent.Actions) || !sameStrings(claims.UPS.Resources, parent.Resources) || !sameConstraints(claims.UPS.Constraints, parent.Constraints) || claims.UPS.ParentLeaseID != parentID(parent) {
+	if !sameStrings(claims.UPS.Actions, parent.Actions) || !sameStrings(claims.UPS.Resources, parent.Resources) || !constraintpkg.Equal(claims.UPS.Constraints, parent.Constraints) || claims.UPS.ParentLeaseID != parentID(parent) {
 		return false
 	}
 	digest := sha256.Sum256([]byte(raw))
@@ -597,18 +598,6 @@ func copyConstraints(values map[string]string) map[string]string {
 		result[key] = value
 	}
 	return result
-}
-
-func sameConstraints(left, right map[string]string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for key, value := range left {
-		if right[key] != value {
-			return false
-		}
-	}
-	return true
 }
 
 func parentID(lease domain.Lease) string {

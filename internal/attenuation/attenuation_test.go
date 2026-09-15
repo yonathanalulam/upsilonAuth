@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+
+	constraintpkg "github.com/yonathanalulam/upsilonAuth/internal/constraints"
 )
 
 func TestValidateMonotonicAttenuation(t *testing.T) {
@@ -240,13 +242,13 @@ func TestRandomDelegationTreesNeverExpandAuthority(t *testing.T) {
 				Expiration: parent.Expiration.Add(-time.Duration(random.Intn(30)) * time.Second), Depth: depth, MaxDepth: parent.MaxDepth,
 				Constraints: attenuateConstraints(random, parent.Constraints),
 			}
-			if setsEqual(toSet(child.Actions), toSet(parent.Actions)) && setsEqual(toSet(child.Resources), toSet(parent.Resources)) && child.Expiration.Equal(parent.Expiration) && constraintsEqual(parent.Constraints, child.Constraints) {
+			if setsEqual(toSet(child.Actions), toSet(parent.Actions)) && setsEqual(toSet(child.Resources), toSet(parent.Resources)) && child.Expiration.Equal(parent.Expiration) && constraintpkg.Equal(parent.Constraints, child.Constraints) {
 				child.Expiration = child.Expiration.Add(-time.Second)
 			}
 			if err := Validate(parent, child); err != nil {
 				t.Fatalf("tree %d depth %d rejected valid attenuation: %v\nparent=%+v\nchild=%+v", tree, depth, err, parent, child)
 			}
-			if !isSubset(toSet(child.Actions), toSet(parent.Actions)) || !resourcesSubset(child.Resources, parent.Resources) || child.Expiration.After(parent.Expiration) || child.MaxDepth > parent.MaxDepth || !constraintsAtLeastAsStrong(parent.Constraints, child.Constraints) {
+			if !isSubset(toSet(child.Actions), toSet(parent.Actions)) || !resourcesSubset(child.Resources, parent.Resources) || child.Expiration.After(parent.Expiration) || child.MaxDepth > parent.MaxDepth || !constraintpkg.AtLeastAsStrong(parent.Constraints, child.Constraints) {
 				t.Fatalf("tree %d depth %d expanded authority", tree, depth)
 			}
 			parent = child

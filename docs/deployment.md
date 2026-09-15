@@ -107,4 +107,4 @@ Use `POST /v1/workloads/:id/rotate-key`. Normal rotation may specify an overlap 
 - Configure trusted proxies and edge rate limits explicitly.
 - Alert on readiness failures, denial/replay spikes, rotations, disables, revocations, and audit export failures.
 - Exercise key compromise, database restore, and revocation outage procedures.
-- Pass [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for the exact source/image revision.
+- Run `make release-check` for the exact source/image revision.

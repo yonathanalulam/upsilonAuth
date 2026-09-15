@@ -36,16 +36,6 @@ screenshots/
 *.sarif
 sbom*.json
 
-# Local AI and design-tool state
-.claude/
-.codex/
-.agents/
-.impeccable/
-website/AGENTS.md
-website/CLAUDE.md
-website/DESIGN.md
-website/PRODUCT.md
-
 # Logs and temporary files
 *.log
 *.tmp

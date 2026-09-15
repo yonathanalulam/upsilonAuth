@@ -204,11 +204,3 @@ func isSubset(candidate, parent map[string]struct{}) bool {
 func setsEqual(left, right map[string]struct{}) bool {
 	return len(left) == len(right) && isSubset(left, right)
 }
-
-func constraintsAtLeastAsStrong(parent, child map[string]string) bool {
-	return constraintpkg.AtLeastAsStrong(parent, child)
-}
-
-func constraintsEqual(left, right map[string]string) bool {
-	return constraintpkg.Equal(left, right)
-}

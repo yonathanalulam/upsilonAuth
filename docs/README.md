@@ -9,4 +9,3 @@
 - [Migrations and recovery](migrations.md)
 - [Threat model](../THREAT_MODEL.md)
 - [Security policy](../SECURITY.md)
-- [Release checklist](../RELEASE_CHECKLIST.md)
