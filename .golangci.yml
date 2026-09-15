@@ -1,0 +1,25 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - exhaustive
+    - gosec
+    - misspell
+    - noctx
+    - nilerr
+    - prealloc
+    - unconvert
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec]
+        text: "G101|G404|G115"
+formatters:
+  enable:
+    - gofmt
+    - goimports
+run:
+  timeout: 5m
+  tests: true

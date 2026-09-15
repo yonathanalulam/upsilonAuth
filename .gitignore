@@ -1,3 +1,58 @@
+# Local configuration and credentials
 .env
+.env.*
+!.env.example
+.secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Dependencies and language caches
+node_modules/
+.cache/
+.node24_modules/
+
+# Build output
 bin/
+build/
+dist/
+out/
+.next/
+*.tsbuildinfo
+
+# Tests, coverage, and generated reports
 coverage.out
+*.coverprofile
+*.lcov
+lcov.info
+coverage/
+.coverage/
+playwright-report/
+test-results/
+reports/
+artifacts/
+screenshots/
+*.sarif
+sbom*.json
+
+# Local AI and design-tool state
+.claude/
+.codex/
+.agents/
+.impeccable/
+website/AGENTS.md
+website/CLAUDE.md
+website/DESIGN.md
+website/PRODUCT.md
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+website-docs-response.html

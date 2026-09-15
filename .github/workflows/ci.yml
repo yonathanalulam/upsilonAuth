@@ -1,0 +1,149 @@
+name: release-gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: upsilonauth_test
+          POSTGRES_USER: upsilon_test
+          POSTGRES_PASSWORD: upsilon_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U upsilon_test -d upsilonauth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      UPSILON_TEST_DATABASE_URL: postgres://upsilon_test:upsilon_test_password@127.0.0.1:5432/upsilonauth_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.8
+          cache-dependency-path: go.sum
+      - name: Formatting
+        run: test -z "$(gofmt -l cmd internal sdk examples)"
+      - name: Unit, integration, property, and race tests
+        run: go test -race ./cmd/... ./internal/... ./sdk/... ./examples/...
+      - name: Vet
+        run: go vet ./cmd/... ./internal/... ./sdk/... ./examples/...
+      - name: Reachable vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./cmd/... ./internal/... ./sdk/... ./examples/...
+      - name: Build commands
+        run: go build -trimpath ./cmd/...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.8
+          cache-dependency-path: go.sum
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          args: ./cmd/... ./internal/... ./sdk/... ./examples/...
+
+  website:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - name: Build amd64 image
+        run: docker buildx build --pull --platform linux/amd64 --load -t upsilonauth:ci-amd64 .
+      - name: Build arm64 image
+        run: docker buildx build --pull --platform linux/arm64 --load -t upsilonauth:ci-arm64 .
+      - name: Validate multi-platform image index
+        run: docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=/tmp/upsilonauth-multiarch.oci.tar .
+      - name: Assert target architectures
+        run: |
+          test "$(docker image inspect --format '{{.Architecture}}' upsilonauth:ci-amd64)" = "amd64"
+          test "$(docker image inspect --format '{{.Architecture}}' upsilonauth:ci-arm64)" = "arm64"
+      - name: Assert non-root runtime
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' upsilonauth:ci-amd64)" = "nonroot:nonroot"
+          test "$(docker image inspect --format '{{.Config.User}}' upsilonauth:ci-arm64)" = "nonroot:nonroot"
+      - name: Scan image vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0 image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL upsilonauth:ci-amd64
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0 image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL upsilonauth:ci-arm64
+      - name: Generate CycloneDX SBOM
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/work" ghcr.io/anchore/syft:v1.51.1 upsilonauth:ci-amd64 -o cyclonedx-json=/work/sbom-amd64.cdx.json
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/work" ghcr.io/anchore/syft:v1.51.1 upsilonauth:ci-arm64 -o cyclonedx-json=/work/sbom-arm64.cdx.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: upsilonauth-sbom
+          path: sbom-*.cdx.json
+
+  quickstart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.8
+          cache-dependency-path: go.sum
+      - name: Generate local credentials
+        run: go run ./cmd/keygen >> "$GITHUB_ENV"
+      - name: Start documented stack
+        run: docker compose up --build -d
+      - name: Wait for readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+      - name: Run enrollment, issuance, delegation, verification, and revocation
+        run: go run ./cmd/smoke -base http://127.0.0.1:8080 -admin "$ADMIN_TOKEN"
+      - if: always()
+        run: docker compose down --volumes

@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: upsilonauth
       POSTGRES_USER: upsilonauth
-      POSTGRES_PASSWORD: upsilonauth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U upsilonauth -d upsilonauth"]
       interval: 5s
@@ -12,20 +12,40 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
 
   upsilonauth:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://upsilonauth:upsilonauth@postgres:5432/upsilonauth?sslmode=disable
+      DATABASE_URL: postgres://upsilonauth:${POSTGRES_PASSWORD}@postgres:5432/upsilonauth?sslmode=disable
+      ALLOW_INSECURE_DATABASE: "true"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is required}
+      CONSUMPTION_TOKEN: ${CONSUMPTION_TOKEN:?CONSUMPTION_TOKEN is required}
+      SIGNING_PRIVATE_KEY: ${SIGNING_PRIVATE_KEY:?SIGNING_PRIVATE_KEY is required}
+      TOKEN_ISSUER: ${TOKEN_ISSUER:-http://upsilonauth:8080}
+      UPSILON_ENV: ${UPSILON_ENV:-development}
+      MIGRATION_MODE: ${MIGRATION_MODE:-apply}
+      REQUIRE_TLS: "false"
       GIN_MODE: release
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${UPSILON_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
 volumes:

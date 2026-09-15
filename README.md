@@ -1,172 +1,164 @@
-# upsilonAuth
+# UpsilonAuth
 
-upsilonAuth is an open-source authorization control plane for machine-to-machine workloads. It issues short-lived Ed25519-signed capability leases and permits workloads to delegate narrower leases without allowing descendants to recover privileges removed by an ancestor.
+Temporary, delegated authority for machine workloads.
 
-The system is designed for task graphs, automation workers, build agents, data pipelines, and service-to-service calls where long-lived bearer credentials create unnecessary exposure.
+UpsilonAuth is an authorization service for machine workloads. It issues temporary capability leases to services, workers, CI/CD jobs, pipelines, serverless functions, agents, MCP servers, and internal automation. Workloads authenticate with Ed25519 signatures, root leases stay within explicit administrator grants, and delegated authority can shrink but cannot expand.
 
-## Security Model
+> **Maturity: beta.** The security model is implemented and covered by unit, property, integration, concurrency, malformed-input, and end-to-end tests. It has not yet received an independent security assessment or substantial production operating history. Do not describe this release as battle-tested or production-ready.
 
-A lease carries an action set, a resource set, an expiration, and a delegation depth. A delegated lease is accepted only when:
+UpsilonAuth is not a human identity provider, Auth0/Keycloak replacement, secrets manager, cloud IAM, API gateway, general policy engine, or replacement for OAuth/OIDC, SPIFFE, OPA, or OpenFGA. It sits between workload identity and protected services to issue and verify task-level machine authority.
 
-- Every child action exists in the parent action set.
-- Every child resource exists in the parent resource set.
-- The child expiration is no later than the parent expiration.
-- The child depth is exactly the parent depth plus one.
-- At least one authority dimension is strictly reduced.
-- The parent is active and unexpired when delegation occurs.
+## Why UpsilonAuth exists
 
-Capability tokens are compact JWTs signed with EdDSA. Target APIs verify them locally from the published JWKS, so request authorization does not require a synchronous control-plane lookup.
+Machine workloads often share credentials that are broader and longer-lived than the task requires. UpsilonAuth lets an administrator set the maximum authority for each workload, then lets that workload request a short lease and delegate a smaller lease to another workload. The resulting token can be checked inside the protected service, while parent, root, and recipient IDs keep the decision traceable.
 
-Root lease issuance is a privileged control-plane operation. The current HTTP surface must be deployed behind workload authentication such as an mTLS gateway, a private service mesh, or an authenticated internal API proxy. Network exposure alone is not an authorization boundary.
+## Interactive example
 
-## Architecture
+The project website includes a frontend-only example of an orchestrator delegating smaller leases to a research agent and browser worker. You can try an allowed request and a denied request, inspect the reason, and see the matching Gin middleware call. The example is illustrative; it does not claim to contact a live authorization server.
 
-The codebase follows Clean Architecture:
-
-- cmd/upsilonauth wires configuration, PostgreSQL, cryptography, HTTP delivery, and graceful shutdown.
-- internal/domain defines core lease data and dependency contracts.
-- internal/attenuation contains pure monotonic attenuation rules.
-- internal/crypto owns Ed25519 key generation, JWT signing, and JWKS serialization.
-- internal/usecase coordinates minting, delegation, signing, hashing, and persistence.
-- internal/repository implements lease persistence with pgx.
-- internal/delivery exposes the Gin HTTP API.
-- sdk/go/middleware provides local capability verification for Gin services.
-
-Dependencies point inward through small interfaces. Delivery does not depend on pgx, and repository code does not own authorization policy.
-
-## Token Claims
-
-JWT registered claims identify the lease and target audience. The subject is included when a workload identity is supplied:
-
-```json
-{
-  "sub": "workload-id",
-  "jti": "lease-id",
-  "iat": 1788861600,
-  "exp": 1788865200,
-  "ups": {
-    "actions": ["read"],
-    "resources": ["orders"],
-    "depth": 1,
-    "parent": "parent-lease-id"
-  }
-}
+```sh
+cd website
+npm install
+npm run dev
 ```
 
-The parent field is omitted for root leases.
+Open `http://localhost:3000/#demo`. Use Node.js 20.9 or newer.
 
-## HTTP API
+## Authority invariant
 
-### POST /v1/leases
-
-Mints a root lease for a target service. TTL values use Go duration syntax.
-
-```json
-{
-  "audience": "service:payments",
-  "actions": ["read", "write"],
-  "resources": ["payments/*"],
-  "ttl": "5m",
-  "max_depth": 3
-}
+```text
+Authority(child)
+  subset-of Authority(parent)
+  subset-of Authority(root lease)
+  subset-of Authority(workload grant)
 ```
 
-### POST /v1/leases/:id/delegate
+Authority includes one audience, actions, canonical resources, expiration, delegation depth, typed constraints, and optional use limits. A delegated lease names its recipient and preserves root/parent/delegator lineage.
 
-Mints a strictly attenuated child lease.
+## Implemented security properties
 
-```json
-{
-  "actions": ["read"],
-  "resources": ["payments/*"],
-  "ttl": "2m"
-}
+- Ed25519 workload identities, signed requests, Ed25519 lease tokens, key IDs, and JWKS verification overlap.
+- Explicit versioned workload grants bound audiences/actions/resources/TTL/depth/delegation/PoP/use/constraints.
+- Strict `typ=upsilon-lease+jwt` schema version 1 with required issuer, audience, subject, expiry, issued-at, not-before, JTI, lease/root/parent/workload lineage, and authority claims.
+- Exact resources and final-segment bounded prefix wildcards only; ambiguous traversal, encoding, separator, Unicode, and glob forms fail closed.
+- Explicit active delegation recipient and signed delegation by the current parent subject.
+- Optional Ed25519 key-thumbprint PoP with DPoP-style method/URI/token binding and replay checks.
+- Recursive transactional revocation, workload disable, workload key rotation/overlap, and authenticated-key transaction binding.
+- `STRICT`, `BOUNDED_STALE`, and `EXPIRY_ONLY` local-verifier revocation modes with ETag/last-known-good caching.
+- Atomic finite-use consumption with verifier authentication and idempotency; no claim that mutable counts are stateless.
+- Request/body/header/token/list/depth bounds, explicit trusted proxies, production TLS/config validation, structured errors/logs, request IDs, readiness, metrics, append-only application audit events, inspection, and lineage tracing.
+
+Read the precise model and residual risks in [THREAT_MODEL.md](THREAT_MODEL.md) and [docs/security-model.md](docs/security-model.md).
+
+## Quickstart
+
+Prerequisites: Go 1.26+, Docker, and Docker Compose v2.
+
+```sh
+git clone https://github.com/yonathanalulam/upsilonAuth.git
+cd upsilonAuth
+go run ./cmd/keygen > .env
+docker compose up --build -d
+curl --fail http://127.0.0.1:8080/readyz
 ```
 
-### GET /.well-known/jwks.json
+Run the complete enrollment → root issuance → explicit delegation → Gin verification → lineage revocation test:
 
-Publishes the active Ed25519 verification key as an OKP JWK.
+```sh
+set -a
+. ./.env
+set +a
+go run ./cmd/smoke -base http://127.0.0.1:8080 -admin "$ADMIN_TOKEN"
+```
 
-## Verification SDK
+Success prints `smoke ok`. PowerShell commands and manual integration guidance are in [docs/quickstart.md](docs/quickstart.md).
+
+## Go integration
 
 ```go
-package main
+control, err := client.NewControlPlane("https://auth.internal", nil, false)
+signer, err := client.NewSigner(workloadID, workloadPrivateKey)
 
-import (
-    "log"
-
-    "github.com/gin-gonic/gin"
-
-    upsmiddleware "upsilonAuth/sdk/go/middleware"
-)
-
-func main() {
-    verifier, err := upsmiddleware.New(upsmiddleware.Config{
-        JWKSURL: "http://upsilonauth:8080/.well-known/jwks.json",
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    router := gin.New()
-    router.GET("/orders", verifier.Require("read", "orders"), func(c *gin.Context) {
-        claims, _ := upsmiddleware.ClaimsFromContext(c)
-        c.JSON(200, gin.H{"workload_id": claims.Subject})
-    })
-    log.Fatal(router.Run(":8090"))
-}
+lease, err := control.RequestLease(ctx, signer, client.LeaseRequest{
+    Audience: "service:payments",
+    Actions: []string{"payments:refund"},
+    Resources: []string{"customer/*"},
+    TTL: "60s",
+    MaxDepth: 2,
+    Constraints: map[string]string{},
+})
 ```
 
-The verifier caches JWKS keys, refreshes on expiry or an unknown key ID, accepts only EdDSA, requires token expiration, validates issued-at time, and checks exact action and resource membership.
+Protect a dynamic Gin resource:
 
-## Local Development
+```go
+verifier, err := middleware.New(middleware.Config{
+    JWKSURL: "https://auth.internal/.well-known/jwks.json",
+    Issuer: "https://auth.internal",
+    Audience: "service:payments",
+    RevocationMode: middleware.RevocationStrict,
+})
 
-Requirements:
+router.POST("/customers/:customerID/refunds",
+    verifier.Require("payments:refund", func(c *gin.Context) string {
+        return "customer/" + c.Param("customerID")
+    }),
+    refundHandler,
+)
+```
 
-- Go 1.23 or newer
-- PostgreSQL 16
-- Docker with Compose for containerized development
+See [docs/sdk.md](docs/sdk.md) for imports, typed enrollment/delegation/revocation, PoP, constraints, limited-use consumers, structured errors, and revocation modes.
+
+## Architecture overview
+
+```text
+Admin grant → Root lease → Delegated lease → Protected service
+                    │              │
+                    └──── PostgreSQL lineage and revocation state
+```
+
+The Go control plane authenticates signed workload requests, checks grant and delegation rules, stores lease lineage in PostgreSQL, and signs leases with Ed25519. Protected services use the Go middleware to verify token claims locally and consult revocation or finite-use state only when their configured mode requires it. See [docs/architecture.md](docs/architecture.md) for component and transaction boundaries.
+
+### Repository map
+
+- `cmd/upsilonauth`: production server and fail-fast configuration.
+- `cmd/migrate`: explicit migration apply/verify command.
+- `cmd/upsilon`: safe lease inspect/trace operator CLI.
+- `cmd/keygen`, `cmd/smoke`: development credentials and tested local flow.
+- `internal/attenuation`, `constraints`, `resource`, `crypto`: authorization invariants and token profile.
+- `internal/usecase`, `repository`, `delivery`: orchestration, PostgreSQL transactions, and Gin API.
+- `sdk/go/client`, `middleware`, `pop`, `autherrors`: developer integration surface.
+- `migrations`: ordered checksum-tracked PostgreSQL migrations.
+- `website`: Next.js product and documentation site.
+
+## Documentation
+
+- [Local quickstart](docs/quickstart.md)
+- [Architecture](docs/architecture.md)
+- [Security model and limits](docs/security-model.md)
+- [HTTP API reference](docs/api.md)
+- [Go SDK](docs/sdk.md)
+- [Deployment](docs/deployment.md)
+- [Migrations and recovery](docs/migrations.md)
+- [Security reporting](SECURITY.md)
+- [Threat model](THREAT_MODEL.md)
+- [Release checklist](RELEASE_CHECKLIST.md)
+
+## Verification
 
 ```sh
 make test
-make build
-DATABASE_URL='postgres://upsilonauth:upsilonauth@localhost:5432/upsilonauth?sslmode=disable' make run
+make vet
+make vuln
+make lint
 ```
 
-Start the complete local stack:
+`make release-check` additionally runs race tests, website lint/build/e2e, and a container build. CI also runs a clean PostgreSQL migration/concurrency suite, the end-to-end Compose quickstart, `linux/amd64` and `linux/arm64` container builds, HIGH/CRITICAL image scans, and CycloneDX SBOM generation.
 
-```sh
-make up
-```
+## Current limitations
 
-The Compose stack applies the initial migration when the PostgreSQL data volume is first created and exposes the API on port 8080.
-
-Stop the stack:
-
-```sh
-make down
-```
-
-## Configuration
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| DATABASE_URL | Yes | PostgreSQL connection URL |
-| GIN_MODE | No | Gin runtime mode; use release outside development |
-
-## Key Lifecycle
-
-The current process generates an Ed25519 signing key at startup. Restarting the control plane rotates the key immediately, which invalidates outstanding leases. This behavior suits fully ephemeral deployments. Deployments requiring restart continuity should add an external key-management adapter before production use.
-
-## Operational Guidance
-
-- Terminate TLS at a trusted ingress or service mesh.
-- Restrict root minting and delegation endpoints to authenticated workloads.
-- Use short expirations aligned with task duration.
-- Keep PostgreSQL private and enable TLS outside local Compose.
-- Export audit events to durable monitoring and incident-response systems.
-- Treat token logs and database token hashes as sensitive security data.
+UpsilonAuth has not had an independent security audit or substantial production use. Rate limits and PoP replay caches are process-local, revocation snapshots are not independently signed, signing-key rotation is operator-managed, and V1 administration uses a static high-entropy bearer credential. The beta has no enterprise support SLA. Production deployments should evaluate operational requirements around key management, revocation distribution, and workload scale. Review [docs/security-model.md](docs/security-model.md) and [THREAT_MODEL.md](THREAT_MODEL.md) before a controlled deployment.
 
 ## License
 
-upsilonAuth is available under the MIT License.
+[MIT](LICENSE)

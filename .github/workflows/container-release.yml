@@ -1,0 +1,51 @@
+name: container-release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Container tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve image reference
+        id: image
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid container tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          echo "ref=ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - name: Build and publish multi-platform image
+        run: >-
+          docker buildx build
+          --pull
+          --platform linux/amd64,linux/arm64
+          --tag "${{ steps.image.outputs.ref }}"
+          --push
+          .
+      - name: Verify published image index
+        run: docker buildx imagetools inspect "${{ steps.image.outputs.ref }}"
