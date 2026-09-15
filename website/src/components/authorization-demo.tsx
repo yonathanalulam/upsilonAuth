@@ -83,6 +83,7 @@ export function AuthorizationDemo() {
   const [selection, setSelection] = useState<DecisionName>("allowed");
   const reduceMotion = useReducedMotion();
   const decision = decisions[selection];
+  const direction = selection === "restricted" ? 1 : -1;
 
   return (
     <section
@@ -92,10 +93,10 @@ export function AuthorizationDemo() {
     >
       <motion.div
         className="section-intro"
-        initial={false}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px)" }}
+        whileInView={{ opacity: 1, transform: "translateY(0px)" }}
         viewport={{ once: true, margin: "-60px" }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 105, damping: 22 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.64, ease: [0.23, 1, 0.32, 1] }}
       >
         <h2 id="demo-heading">See delegation in action.</h2>
         <p>This frontend-only interactive example shows how a capability gets smaller as it moves between workloads. Choose a request to see the decision a protected service would make.</p>
@@ -103,10 +104,10 @@ export function AuthorizationDemo() {
 
       <motion.div
         className="demo-workspace"
-        initial={false}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={reduceMotion ? false : { opacity: 0, transform: "translateY(14px)" }}
+        whileInView={{ opacity: 1, transform: "translateY(0px)" }}
         viewport={{ once: true, margin: "-40px" }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 96, damping: 22 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
       >
         <div className="demo-lineage" aria-label="Delegation chain">
           <div className="demo-panel-heading">
@@ -166,7 +167,14 @@ export function AuthorizationDemo() {
                 aria-pressed={selection === "allowed"}
                 onClick={() => setSelection("allowed")}
               >
-                Run allowed request
+                {selection === "allowed" && (
+                  <motion.i
+                    className="demo-active-indicator"
+                    layoutId="active-request"
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.77, 0, 0.175, 1] }}
+                  />
+                )}
+                <span>Run allowed request</span>
                 <code>web:read</code>
               </button>
               <button
@@ -175,7 +183,14 @@ export function AuthorizationDemo() {
                 aria-pressed={selection === "restricted"}
                 onClick={() => setSelection("restricted")}
               >
-                Attempt restricted action
+                {selection === "restricted" && (
+                  <motion.i
+                    className="demo-active-indicator"
+                    layoutId="active-request"
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.77, 0, 0.175, 1] }}
+                  />
+                )}
+                <span>Attempt restricted action</span>
                 <code>database:delete</code>
               </button>
             </div>
@@ -191,10 +206,10 @@ export function AuthorizationDemo() {
                 className="demo-decision-result"
                 key={selection}
                 role="status"
-                initial={reduceMotion ? false : { opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                transition={{ duration: reduceMotion ? 0 : 0.16 }}
+                initial={reduceMotion ? false : { opacity: 0, transform: `translateX(${direction * 9}px)` }}
+                animate={{ opacity: 1, transform: "translateX(0px)" }}
+                exit={reduceMotion ? undefined : { opacity: 0, transform: `translateX(${direction * -6}px)` }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.77, 0, 0.175, 1] }}
               >
                 <div className={clsx("demo-decision-status", decision.status === "ALLOW" ? "is-allow" : "is-deny")}>
                   {decision.status === "ALLOW" ? <Check size={17} aria-hidden="true" /> : <ShieldX size={17} aria-hidden="true" />}
