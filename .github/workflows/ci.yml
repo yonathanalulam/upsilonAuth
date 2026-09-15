@@ -114,7 +114,7 @@ jobs:
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/work" ghcr.io/anchore/syft:v1.51.1 upsilonauth:ci-amd64 -o cyclonedx-json=/work/sbom-amd64.cdx.json
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/work" ghcr.io/anchore/syft:v1.51.1 upsilonauth:ci-arm64 -o cyclonedx-json=/work/sbom-arm64.cdx.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: upsilonauth-sbom
           path: sbom-*.cdx.json
